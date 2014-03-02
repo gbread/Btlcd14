@@ -1,4 +1,4 @@
-package bigdickplayer;
+package paulTheConqueror;
 
 import java.util.ArrayList;
 import java.util.Random;
@@ -98,7 +98,7 @@ public class RobotPlayer{
 				simpleMove(towardClosest);
 			}
 		}else{//NAVIGATION BY DOWNLOADED PATH
-			/*rc.setIndicatorString(0, "team "+myBand+", path length "+path.size());
+			rc.setIndicatorString(0, "team "+myBand+", path length "+path.size());
 			if(path.size()<=1){
 				//check if a new path is available
 				int broadcastCreatedRound = rc.readBroadcast(myBand);
@@ -113,10 +113,10 @@ public class RobotPlayer{
 				Direction bdir = BreadthFirst.getNextDirection(path, bigBoxSize);
 				BasicPathing.tryToMove(bdir, true, rc, directionalLooks, allDirections);
 			}
-			*/
 			
-			Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
-			BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
+			
+			//Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
+			//BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections);//was Direction.SOUTH_EAST
 			
 		}
 		
