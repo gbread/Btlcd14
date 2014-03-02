@@ -224,3 +224,15 @@ pip-log.txt
 #Mr Developer
 .mr.developer.cfg
 /nbproject/private/
+
+#InteliJ IDEA
+.idea/
+out/
+*.iml
+*.iws
+*.ipr
+classes/
+
+*.class
+*.war
+*.jar
