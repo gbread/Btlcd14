@@ -236,3 +236,5 @@ classes/
 *.class
 *.war
 *.jar
+
+.installationinformation
