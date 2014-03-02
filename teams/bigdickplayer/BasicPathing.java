@@ -25,7 +25,7 @@ public class BasicPathing{
 		return rc.canMove(dir);
 	}
 	
-	public static void tryToMove(Direction chosenDirection,boolean selfAvoiding,RobotController rc, int[] directionalLooks, Direction[] allDirections, boolean sneak) throws GameActionException{
+	public static void tryToMove(Direction chosenDirection,boolean selfAvoiding, RobotController rc, int[] directionalLooks, Direction[] allDirections, boolean sneak) throws GameActionException{
 		while(snailTrail.size()<2)
 			snailTrail.add(new MapLocation(-1,-1));
 		if(rc.isActive()){

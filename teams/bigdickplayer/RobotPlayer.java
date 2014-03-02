@@ -14,6 +14,9 @@ public class RobotPlayer{
 	static ArrayList<MapLocation> path = new ArrayList<MapLocation>();
 	static int bigBoxSize = 5;
 	
+	static boolean weHavePastr = false;
+	static boolean weHaveNoiseTower = false;
+	
 	//HQ data:
 	static MapLocation rallyPoint;
 	
@@ -35,18 +38,29 @@ public class RobotPlayer{
 		}else{
 			BreadthFirst.rc=rcIn;//slimmed down init
 		}
+		//rc.broadcast(0, 0);
 		//MapLocation goal = getRandomLocation();
 		//path = BreadthFirst.pathTo(VectorFunctions.mldivide(rc.getLocation(),bigBoxSize), VectorFunctions.mldivide(goal,bigBoxSize), 100000);
 		//VectorFunctions.printPath(path,bigBoxSize);
-		
+		 
 
 		while(true){
 			try{
-				if(rc.getType()==RobotType.HQ){
+				switch (rc.getType()) {
+				case HQ:
 					runHQ();
-				}else if(rc.getType()==RobotType.SOLDIER){
+					break;
+				case SOLDIER:
 					runSoldier();
+					break;
+				case PASTR:
+					runPastr();
+					break;
+				case NOISETOWER:
+					runNoiseTower();
+					break;
 				}
+				
 			}catch (Exception e){
 				e.printStackTrace();
 			}
@@ -54,18 +68,56 @@ public class RobotPlayer{
 		}
 	}
 	
+	static double noiseTowerAngle = 0;
+	static double noiseTowerRadius = 0;	
+	static final double angleTurn = Math.PI/4; 
+	static final double noiseTowerRadiusDiff = 2; 
+	
+	private static void runNoiseTower() throws GameActionException {
+		Comms.noiseTowerBuildingInProgress();
+		if (rc.isActive()) {
+			
+			int radiusSquared = 300;
+			
+			if (noiseTowerAngle > 2*Math.PI) {
+				noiseTowerAngle -= 2*Math.PI;
+			}
+			
+			MapLocation thisLocation = rc.getLocation();
+			
+			MapLocation relativeLocation = new MapLocation((int)(Math.cos(noiseTowerAngle)*noiseTowerRadius), (int)(-Math.sin(noiseTowerAngle)*noiseTowerRadius));
+
+			MapLocation boomLocation = VectorFunctions.mladd(thisLocation, relativeLocation);
+
+			rc.attackSquare(boomLocation);
+			
+			if (Comms.getOurPastrLocation().distanceSquaredTo(boomLocation) < 60) {
+				noiseTowerRadius = (int)Math.sqrt(radiusSquared);
+				noiseTowerAngle += angleTurn;
+			}
+
+			noiseTowerRadius -= noiseTowerRadiusDiff;
+			
+		}
+	}
+
+	private static void runPastr() {
+		Comms.pastrBuildingInProgress(rc.getLocation());
+		
+	}
+
 	private static void runHQ() throws GameActionException {
 		//TODO consider updating the rally point to an allied pastr 
 		
 		//tell them to go to the rally point
-		Comms.findPathAndBroadcast(1,rc.getLocation(),rallyPoint,bigBoxSize,2);
+		//Comms.findPathAndBroadcast(1,rc.getLocation(),rallyPoint,bigBoxSize,2);
 		
 		//if the enemy builds a pastr, tell sqaud 2 to go there.
 		MapLocation[] enemyPastrs = rc.sensePastrLocations(rc.getTeam().opponent());
 		if(enemyPastrs.length>0){
-			Comms.findPathAndBroadcast(2,rallyPoint,enemyPastrs[0],bigBoxSize,2);//for some reason, they are not getting this message
+			//Comms.findPathAndBroadcast(2,rallyPoint,enemyPastrs[0],bigBoxSize,2);//for some reason, they are not getting this message
 		}
-		
+		//rc.broadcast(0, 0);
 		//after telling them where to go, consider spawning
 		tryToSpawn();
 	}
@@ -84,6 +136,32 @@ public class RobotPlayer{
 	}
 	
 	private static void runSoldier() throws GameActionException {
+		if (!rc.isActive()) return;
+		
+		if (rc.isConstructing()) {
+			if (rc.getConstructingType() == RobotType.PASTR) {
+				Comms.pastrBuildingInProgress(rc.getLocation());
+			} else if (rc.getConstructingType() == RobotType.NOISETOWER) {
+				Comms.noiseTowerBuildingInProgress();
+			}
+			
+			return;
+		}
+		//if (rc.getRobot().getID() < 150) {
+			System.out.println(weHavePastr);
+			System.out.println(weHaveNoiseTower);
+			weHavePastr = Comms.doWeHavePastr();
+			weHaveNoiseTower = Comms.doWeHaveTower();
+
+		//}
+		/*
+		if (!weHavePastr && rc.senseCowsAtLocation(rc.getLocation()) > 0) {
+			
+			weHavePastr = true;
+			Comms.pastrBuildingInProgress();
+			rc.construct(RobotType.PASTR);
+		} */
+		
 		//follow orders from HQ
 		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,10000,rc.getTeam().opponent());
 		if(enemyRobots.length>0){//SHOOT AT, OR RUN TOWARDS, ENEMIES
@@ -93,11 +171,29 @@ public class RobotPlayer{
 				if(rc.isActive()){
 					rc.attackSquare(closestEnemyLoc);
 				}
-			}else{//not close enough to shoot, so try to go shoot
+			} /*else {//not close enough to shoot, so try to go shoot
 				Direction towardClosest = rc.getLocation().directionTo(closestEnemyLoc);
 				simpleMove(towardClosest);
+			}*/
+		} else if (!weHavePastr && rc.senseCowsAtLocation(rc.getLocation()) > 0) {
+			
+			weHavePastr = true;
+			Comms.pastrBuildingInProgress(rc.getLocation());
+			rc.construct(RobotType.PASTR);
+		} else if (weHavePastr && !weHaveNoiseTower) {
+			MapLocation[] pastrLocations = rc.sensePastrLocations(rc.getTeam());
+			if (pastrLocations.length == 0) return;
+			
+			MapLocation pastrLocation = pastrLocations[0];
+			if (rc.getLocation().distanceSquaredTo(pastrLocation) <= 2) {
+				buildNoiseTower();
+			} else {
+			
+				BasicPathing.tryToMove(rc.getLocation().directionTo(pastrLocation), true, rc, directionalLooks, allDirections, false);
 			}
-		}else{//NAVIGATION BY DOWNLOADED PATH
+			
+		} else {
+			//NAVIGATION BY DOWNLOADED PATH
 			/*rc.setIndicatorString(0, "team "+myBand+", path length "+path.size());
 			if(path.size()<=1){
 				//check if a new path is available
@@ -125,6 +221,12 @@ public class RobotPlayer{
 		
 	}
 	
+	private static void buildNoiseTower() throws GameActionException {
+		weHaveNoiseTower = true;
+		Comms.noiseTowerBuildingInProgress();
+		rc.construct(RobotType.NOISETOWER);
+	}
+
 	private static MapLocation getRandomLocation() {
 		return new MapLocation(randall.nextInt(rc.getMapWidth()),randall.nextInt(rc.getMapHeight()));
 	}
