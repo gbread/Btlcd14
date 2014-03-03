@@ -207,14 +207,12 @@ public class Comms{
 		}
 	}
 	
-	public static void pastrBuildingInProgress(MapLocation location) {
-		try {
+	public static void pastrDestroyed() throws GameActionException {
+		rc.broadcast(PASTR_CHANNEL, 0);
+	}
+	public static void pastrBuildingInProgress(MapLocation location) throws GameActionException {
 			rc.broadcast(PASTR_CHANNEL, 1);
 			rc.broadcast(PASTR_LOCATION_CHANNEL, VectorFunctions.locToInt(location));
-		} catch (GameActionException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 	}
 	public static void noiseTowerBuildingInProgress() {
 		try {
@@ -225,7 +223,7 @@ public class Comms{
 		}
 	}
 	public static boolean doWeHavePastr() throws GameActionException {
-		return rc.readBroadcast(PASTR_CHANNEL) == 1;
+		return rc.readBroadcast(PASTR_CHANNEL) != 0;
 	}
 	public static MapLocation getOurPastrLocation() throws GameActionException {
 		return VectorFunctions.intToLoc(rc.readBroadcast(PASTR_LOCATION_CHANNEL));
