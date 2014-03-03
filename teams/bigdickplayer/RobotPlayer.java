@@ -24,22 +24,19 @@ public class RobotPlayer{
 	//SOLDIER data:
 	static int myBand = 100;
 	static int pathCreatedRound = -1;
-<<<<<<< HEAD
+
 	private static Robot[] enemyRobots;
 	private static MapLocation[] robotLocations = new MapLocation[0];
 	private static MapLocation closestEnemyLoc = null;
 	private static int closestEnemyID;
 	private static boolean hadPastr = false;
 	
-	public static void run(RobotController rcIn) throws GameActionException{
-		rc=rcIn;
-=======
 
     static MapLocation maxCow = null;
 
     public static void run(RobotController rcIn) throws GameActionException {
         rc=rcIn;
->>>>>>> d37085e40f1a36101dd7e4b57e830ed4849b2d99
+
 		Comms.rc = rcIn;
 		randall.setSeed(rc.getRobot().getID());
 		
@@ -296,11 +293,9 @@ public class RobotPlayer{
 			*/
 			
 			// TODO NAJDEME NEJBLIZSI KRAVY (chytreji)
-<<<<<<< HEAD
-			Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
-			BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
-=======
-//			Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
+
+			//Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
+			//BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
 
             if (maxCow == null) {
                 maxCow = findCows();
@@ -308,32 +303,7 @@ public class RobotPlayer{
 
             Direction towardEnemy = rc.getLocation().directionTo(maxCow);
             BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
-        } else if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
-			// nekdo utoci na pastr
-			int[] attackingRobots = Comms.getAttacks(AttackType.PastrAttack);
-			int[][] soldiers = Comms.getEnemySoldiersAndLocations();
-			int soldierToAttackId = -1;
-			
-			outerloop:
-			for (int i = 0; i < soldiers.length; i++) {
-				for (int j = 0; j < attackingRobots.length; j++) {
-					if (soldiers[i][0] == attackingRobots[j]) {
-						soldierToAttackId = i;
-						break outerloop;
-					}					
-				}
-			}
-			if (soldierToAttackId == -1) {
-				Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
-				BasicPathing.guardLocation(towardEnemy, Comms.getOurPastrLocation(), true, rc, directionalLooks, allDirections, true);
-
-			} else {
-				
-				Direction towardEnemy = rc.getLocation().directionTo(VectorFunctions.intToLoc(soldiers[soldierToAttackId][1]));
-				BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
-			}
-			
->>>>>>> d37085e40f1a36101dd7e4b57e830ed4849b2d99
+        
 		} else {
 			// mame pastr a vez, tak je budeme chranit
 			MapLocation pastrLocation = Comms.getOurPastrLocation();
