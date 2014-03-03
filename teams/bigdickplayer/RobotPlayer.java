@@ -152,11 +152,11 @@ public class RobotPlayer{
 	}
 	
 	static boolean tryAttackSomeoneIfNear(boolean tryToMoveCloserToShoot) throws GameActionException {
-		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,10000,rc.getTeam().opponent());
+		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,15000,rc.getTeam().opponent());
 		if(enemyRobots.length>0){//SHOOT AT, OR RUN TOWARDS, ENEMIES
 			MapLocation[] robotLocations = VectorFunctions.robotsToLocations(enemyRobots, rc);
 			MapLocation closestEnemyLoc = VectorFunctions.findClosest(robotLocations, rc.getLocation());
-			if(closestEnemyLoc.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){//close enough to shoot
+			if(closestEnemyLoc.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared+1){//close enough to shoot
 				if(rc.isActive()){
 					rc.attackSquare(closestEnemyLoc);
 				}
