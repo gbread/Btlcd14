@@ -1,10 +1,10 @@
 package bigdickplayer;
 
-import java.util.ArrayList;
-import java.util.Random;
-
 import battlecode.common.*;
 import bigdickplayer.Comms.AttackType;
+
+import java.util.ArrayList;
+import java.util.Random;
 
 public class RobotPlayer{
 	
@@ -24,9 +24,11 @@ public class RobotPlayer{
 	//SOLDIER data:
 	static int myBand = 100;
 	static int pathCreatedRound = -1;
-	
-	public static void run(RobotController rcIn) throws GameActionException{
-		rc=rcIn;
+
+    static MapLocation maxCow = null;
+
+    public static void run(RobotController rcIn) throws GameActionException {
+        rc=rcIn;
 		Comms.rc = rcIn;
 		randall.setSeed(rc.getRobot().getID());
 		
@@ -138,9 +140,9 @@ public class RobotPlayer{
 
 	}
 
-	
-	public static void tryToSpawn() throws GameActionException {
-		if(rc.isActive()&&rc.senseRobotCount()<GameConstants.MAX_ROBOTS){
+
+    public static void tryToSpawn() throws GameActionException {
+        if(rc.isActive()&&rc.senseRobotCount()<GameConstants.MAX_ROBOTS){
 			for(int i=0;i<8;i++){
 				Direction trialDir = allDirections[i];
 				if(rc.canMove(trialDir)){
@@ -234,9 +236,15 @@ public class RobotPlayer{
 			*/
 			
 			// TODO NAJDEME NEJBLIZSI KRAVY (chytreji)
-			Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
-			BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
-		} else if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
+//			Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
+
+            if (maxCow == null) {
+                maxCow = findCows();
+            }
+
+            Direction towardEnemy = rc.getLocation().directionTo(maxCow);
+            BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
+        } else if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
 			// nekdo utoci na pastr
 			int[] attackingRobots = Comms.getAttacks(AttackType.PastrAttack);
 			int[][] soldiers = Comms.getEnemySoldiersAndLocations();
@@ -287,8 +295,37 @@ public class RobotPlayer{
 		return new MapLocation(randall.nextInt(rc.getMapWidth()),randall.nextInt(rc.getMapHeight()));
 	}
 
-	private static void simpleMove(Direction chosenDirection) throws GameActionException{
-		if(rc.isActive()){
+    /**
+     * Najde kravy (snad)
+     *
+     * @return
+     */
+    private static MapLocation findCows() {
+
+        double[][] cows = rc.senseCowGrowth(); //Stoji 100 bytecodu!! (TODO:mozna volat jen jednou pokud je pole staticke a nekam si ho ulozit)
+
+        double max = Double.MIN_VALUE;
+        int x = cows.length / 2;
+        int y = cows[0].length / 2;
+
+        for (int i = 0; i < cows.length; i++) {
+            double[] cowRow = cows[i];
+            for (int j = 0; j < cowRow.length; j++) {
+                double cow = cowRow[j];
+
+                if (cow > max) {
+                    max = cow;
+                    x = i;
+                    y = j;
+                }
+            }
+        }
+
+        return new MapLocation(x, y);
+    }
+
+    private static void simpleMove(Direction chosenDirection) throws GameActionException {
+        if(rc.isActive()){
 			for(int directionalOffset:directionalLooks){
 				int forwardInt = chosenDirection.ordinal();
 				Direction trialDir = allDirections[(forwardInt+directionalOffset+8)%8];
