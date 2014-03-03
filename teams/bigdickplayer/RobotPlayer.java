@@ -4,6 +4,7 @@ import battlecode.common.*;
 import bigdickplayer.Comms.AttackType;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Random;
 
 public class RobotPlayer{
@@ -28,6 +29,9 @@ public class RobotPlayer{
 	private static Robot[] enemyRobots;
 	private static MapLocation[] robotLocations = new MapLocation[0];
 	private static MapLocation closestEnemyLoc = null;
+	private static boolean didShot = false;
+	private static MapLocation didShotAt = null;
+	private static int didShotAtId = -1;
 	private static int closestEnemyID;
 	private static boolean hadPastr = false;
 	
@@ -56,17 +60,23 @@ public class RobotPlayer{
 		
 		Comms.initArrays();
 		
-		HealthInfo.setHealth(rc.getHealth()); 
 
 		while(true) {
+			HealthInfo.setHealth(rc.getHealth()); 
 			closestEnemyLoc = null;
 			enemyRobots = rc.senseNearbyGameObjects(Robot.class,15000,rc.getTeam().opponent());
 			if (enemyRobots.length > 0) {
 				robotLocations = VectorFunctions.robotsToLocations(enemyRobots, rc);
 				closestEnemyLoc = VectorFunctions.findClosest(robotLocations, rc.getLocation());
 				closestEnemyID = rc.senseObjectAtLocation(closestEnemyLoc).getID();
+				boolean was = false;
 				for (int i = 0; i < enemyRobots.length; i++) {
+					was |= (enemyRobots[i].getID() == didShotAtId);
 					Comms.addOrUpdateEnemySolierLocation(enemyRobots[i].getID(), robotLocations[i]);
+				}
+				if (!was) {
+					Comms.deleteEnemySoldierAndLocation(didShotAtId);
+					Comms.deleteAttackerFromArrays(didShotAtId);
 				}
 			}
 			try{
@@ -93,7 +103,8 @@ public class RobotPlayer{
 	}
 	
 	static double noiseTowerAngle = 0;
-	static double noiseTowerRadius = 0;	
+	static double noiseTowerRadius = 0;
+	private static int[][] soldierAndLocations;	
 	static final double angleTurn = Math.PI/4; 
 	static final double noiseTowerRadiusDiff = 2; 
 	
@@ -130,6 +141,7 @@ public class RobotPlayer{
 
 		if (enemyRobots.length > 0) {
 			for (int i = 0; i < enemyRobots.length; i++) {
+				System.out.println("PASTR");
 				Comms.addRobotIdToArray(AttackType.PastrAttack, enemyRobots[i].getID());
 			}
 		} else {
@@ -155,6 +167,33 @@ public class RobotPlayer{
 		//rc.broadcast(0, 0);
 		//after telling them where to go, consider spawning
 		tryToSpawn();
+		
+		// DEBUG
+		
+		if (Clock.getRoundNum() < 200 ) {
+			if (Comms.getEnemySoldiersAndLocations().length > 0) {
+				
+				int[][] enemies = Comms.getEnemySoldiersAndLocations();
+				System.out.print("All enemies soldiers: ");
+				for (int i = 0; i < enemies.length; i++) {
+					System.out.print(enemies[i][0] + ":");
+					
+					System.out.print(VectorFunctions.intToLoc(enemies[i][1]) + " ");
+				}
+				System.out.println();
+			}
+			if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
+				System.out.println("Pastr attackers count: " + Comms.getAttackersCount(AttackType.PastrAttack));
+				System.out.println("Pastr attackers: " + Arrays.toString(Comms.getAttacks(AttackType.PastrAttack)));
+			}
+			if (Comms.getAttackersCount(AttackType.SoldierAttack) > 0) {
+				System.out.println("Soldier attackers count: " + Comms.getAttackersCount(AttackType.SoldierAttack));
+				System.out.println("Soldier attackers: " + Arrays.toString(Comms.getAttacks(AttackType.SoldierAttack)));
+			}
+			//System.out.println("Pastr attackers: " + Arrays.toString(Comms.getAttacks(AttackType.PastrAttack)));
+			//System.out.println(Comms.getEnemySoldiersAndLocations());
+		}
+		
 
 	}
 
@@ -176,6 +215,8 @@ public class RobotPlayer{
 			if(closestEnemyLoc.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared+1){//close enough to shoot
 				if(rc.isActive()){
 					rc.attackSquare(closestEnemyLoc);
+					didShotAt = closestEnemyLoc;
+					didShotAtId = rc.senseObjectAtLocation(closestEnemyLoc).getID();
 					return true;
 				}
 			} else if (tryToMoveCloserToShoot) {//not close enough to shoot, so try to go shoot
@@ -191,7 +232,7 @@ public class RobotPlayer{
 		if (!rc.isActive()) return;
 		
 		if (HealthInfo.attacked) {
-			Comms.addRobotIdToArray(AttackType.SoldierAttack, rc.senseObjectAtLocation(closestEnemyLoc).getID());
+			Comms.addRobotIdToArray(AttackType.SoldierAttack, didShotAtId);
 		}
 		
 		if (rc.isConstructing()) {
@@ -219,42 +260,45 @@ public class RobotPlayer{
 			Comms.pastrBuildingInProgress();
 			rc.construct(RobotType.PASTR);
 		} */
-		
-			
+						
 			MapLocation closestSoldierAttacker = VectorFunctions.closestRobotToLocation(Comms.getAttacks(AttackType.SoldierAttack), rc.getLocation(), rc);
 			
+			soldierAndLocations = Comms.getEnemySoldiersAndLocations();
 			//follow orders from HQ
 		
 			
 			
-		if(tryAttackSomeoneIfNear(false)){//SHOOT AT, OR RUN TOWARDS, ENEMIES
+		if(didShot = tryAttackSomeoneIfNear(false)){//SHOOT AT, OR RUN TOWARDS, ENEMIES
 			
-		}else if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
+		} else if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
 			// nekdo utoci na pastr
 			int[] attackingRobots = Comms.getAttacks(AttackType.PastrAttack);
-			int[][] soldiers = Comms.getEnemySoldiersAndLocations();
+			
 			int soldierToAttackId = -1;
 			
 			outerloop:
-			for (int i = 0; i < soldiers.length; i++) {
+			for (int i = 0; i < soldierAndLocations.length; i++) {
 				for (int j = 0; j < attackingRobots.length; j++) {
-					if (soldiers[i][0] == attackingRobots[j]) {
+					if (soldierAndLocations[i][0] == attackingRobots[j]) {
 						soldierToAttackId = i;
 						break outerloop;
 					}					
 				}
 			}
 			if (soldierToAttackId == -1) {
+				// TODO nejblizsiho
 				Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
 				BasicPathing.guardLocation(towardEnemy, Comms.getOurPastrLocation(), true, rc, directionalLooks, allDirections, true);
 
 			} else {
 				
-				Direction towardEnemy = rc.getLocation().directionTo(VectorFunctions.intToLoc(soldiers[soldierToAttackId][1]));
+				Direction towardEnemy = rc.getLocation().directionTo(VectorFunctions.intToLoc(soldierAndLocations[soldierToAttackId][1]));
 				BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
 			}
 			
-		} else if (closestSoldierAttacker != null && closestSoldierAttacker.distanceSquaredTo(rc.getLocation()) < 30) {
+		} /*else if(soldierAndLocations.length > 0) {
+			
+		}*/ else if (closestSoldierAttacker != null && closestSoldierAttacker.distanceSquaredTo(rc.getLocation()) < 40) {
 			 BasicPathing.tryToMove(rc.getLocation().directionTo(closestSoldierAttacker), true, rc, directionalLooks, allDirections, false);
 			
 		} else if (!weHavePastr && rc.senseCowsAtLocation(rc.getLocation()) > 0) {

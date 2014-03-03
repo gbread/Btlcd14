@@ -96,6 +96,15 @@ public class Comms{
 		}
 		return -1;
 	}
+	private static void deleteIndexOfTupleArray(int channel, int index, int tupleSize) throws GameActionException {
+		int size = getSizeOfTupleArray(channel);
+		setSizeOfTupleArray(channel, --size);
+		for (int i = 0; i < tupleSize; i++) {
+			int val = rc.readBroadcast(channel+2+size*tupleSize + i);
+			rc.broadcast(channel+2+index*tupleSize + i, val);
+		}
+	}
+	
 
 	static int[][] getEnemySoldiersAndLocations() throws GameActionException {
 		return getTupleArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL);
@@ -120,7 +129,13 @@ public class Comms{
 	static void clearEnemySoldiersAndLocations() throws GameActionException {
 		setSizeOfTupleArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL, 0);
 	}
-
+	static void deleteEnemySoldierAndLocation(int robotId) throws GameActionException {
+		int index = getIndexOfTupleInArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL, ENEMY_SOLDIERS_LOCATIONS_TUPLE_SIZE,
+											robotId, ENEMY_SOLDIERS_LOCATIONS_TUPLE_INDEX_ROBOTID);
+		if (index >= 0) {
+			deleteIndexOfTupleArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL, index, ENEMY_SOLDIERS_LOCATIONS_TUPLE_SIZE);
+		}
+	}
 	
 	
 	// set of methods to handle with arrays of maplocations
@@ -136,9 +151,13 @@ public class Comms{
 	static int getArrayCount(int channel) throws GameActionException {
 		return rc.readBroadcast(channel);
 	}
+	static void setArrayCount(int channel, int count) throws GameActionException {
+		rc.broadcast(channel, count);
+	}
 	private static int addIntToArray(int channel, int value) throws GameActionException {
 		int count = getArrayCount(channel);
-		rc.broadcast(channel + ++count, value);
+		rc.broadcast(channel + (++count), value);
+		setArrayCount(channel, count);
 		return count;
 	}
 	private static boolean deleteValueFromArray(int channel, int index) throws GameActionException {
@@ -146,6 +165,7 @@ public class Comms{
 		if (index >= count) return false;
 		int lastItem = rc.readBroadcast(channel + count--);
 		rc.broadcast(channel + index + 1, lastItem);
+		setArrayCount(channel, count);
 		return true;
 	}
 	private static int clear(int channel) throws GameActionException {
@@ -153,7 +173,14 @@ public class Comms{
 		rc.broadcast(channel, 0);
 		return count;
 	}
-
+	private static int findValue(int channel, int value) throws GameActionException {
+		int count = getArrayCount(channel);
+		for (int i = 0; i < count; i++) {
+			int val = rc.readBroadcast(channel + 1 + i);
+			if (val == value) return i;
+		}
+		return -1;
+	}
 	
   	public static int[] getAttacks(AttackType type) throws GameActionException {
 		int channel = type.getChannel();
@@ -165,9 +192,11 @@ public class Comms{
  	}
  	static int addRobotIdToArray(AttackType type, int RobotId) throws GameActionException {
  		int channel = type.getChannel();
-		return addIntToArray(channel, RobotId);
+ 		if (findValue(channel, RobotId) == -1)
+ 			return addIntToArray(channel, RobotId);
+ 		return 0;
  	}
- 	static boolean deleteAttackerFromArray(AttackType type, int index) throws GameActionException {
+ 	static boolean deleteAttackerFromArrayAt(AttackType type, int index) throws GameActionException {
  		int channel = type.getChannel();
 		return deleteValueFromArray(channel, index);
  	}
@@ -176,7 +205,16 @@ public class Comms{
 		return clear(channel);
 		
  	}
- 	
+ 	public static void deleteAttackerFromArrays(int robotId) throws GameActionException {
+		deleteAttackerFromArray(AttackType.PastrAttack, robotId);
+		deleteAttackerFromArray(AttackType.SoldierAttack, robotId);
+	}
+	private static void deleteAttackerFromArray(AttackType pastrattack, int robotId) throws GameActionException {
+		int channel = pastrattack.getChannel();
+		int index = findValue(channel, robotId);
+		if (index > 0)
+			deleteAttackerFromArrayAt(pastrattack, index);
+	}
  	
  	
 	public static ArrayList<MapLocation> downloadPath() throws GameActionException {
@@ -231,4 +269,5 @@ public class Comms{
 	public static boolean doWeHaveTower() throws GameActionException {
 		return rc.readBroadcast(NOISE_TOWER_CHANNEL) == 1;
 	}
+	
 }
