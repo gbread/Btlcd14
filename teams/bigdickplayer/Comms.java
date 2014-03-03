@@ -13,6 +13,67 @@ public class Comms{
 	static final int NOISE_TOWER_CHANNEL = 65001;
 	static final int PASTR_LOCATION_CHANNEL = 65002;
 	
+	// TODO utoky - chceme vedet na co a odkud zautocil nepritel
+	static final int SOLDIER_ATTACKS_CHANNEL = 65010;
+	static final int PASTR_OR_TOWER_ATTACKS_CHANNEL = 64050;
+	
+	enum AttackType {
+		SoldierAttack, PastrAttack, HQAttack;
+		int getChannel() {
+			switch (this) {
+				case SoldierAttack:
+				case HQAttack:
+					return SOLDIER_ATTACKS_CHANNEL;
+				case PastrAttack:
+					return PASTR_OR_TOWER_ATTACKS_CHANNEL;
+				default:
+					return -1;
+			}
+			
+		}
+	}
+	
+	// set of methods to handle with arrays of maplocations
+	private static MapLocation[] getMapLocationsArray(int channel) throws GameActionException {
+		int count = rc.readBroadcast(channel);
+		MapLocation[] result = new MapLocation[count];
+		for (int i = 0; i < result.length; i++) {
+			result[i] = VectorFunctions.intToLoc(rc.readBroadcast(channel + 1 + i));
+		}
+		return result;
+	}
+	static int getMapLocationsArrayCount(int channel) throws GameActionException {
+		return rc.readBroadcast(channel);
+	}
+	private static int addMapLocationToArray(int channel, MapLocation location) throws GameActionException {
+		int count = getMapLocationsArrayCount(channel);
+		rc.broadcast(channel + ++count, VectorFunctions.locToInt(location));
+		return count;
+	}
+	private static boolean deleteMapLocationFromArray(int channel, int index) throws GameActionException {
+		int count = getMapLocationsArrayCount(channel);
+		if (index >= count) return false;
+		int lastItem = rc.readBroadcast(channel + count--);
+		rc.broadcast(channel + index + 1, lastItem);
+		return true;
+	}
+	
+ 	public static MapLocation[] getAttacks(AttackType type) throws GameActionException {
+		int channel = type.getChannel();
+		return getMapLocationsArray(channel);
+	}
+ 	static int getAttackersCount(AttackType type) throws GameActionException {
+		int channel = type.getChannel();
+		return getMapLocationsArrayCount(channel);
+ 	}
+ 	static int addMapLocationToArray(AttackType type, MapLocation location) throws GameActionException {
+ 		int channel = type.getChannel();
+		return addMapLocationToArray(channel, location);
+ 	}
+ 	static boolean deleteAttackerFromArray(AttackType type, int index) throws GameActionException {
+ 		int channel = type.getChannel();
+		return deleteMapLocationFromArray(channel, index);
+ 	}
 	
 	public static ArrayList<MapLocation> downloadPath() throws GameActionException {
 		ArrayList<MapLocation> downloadedPath = new ArrayList<MapLocation>();
@@ -25,7 +86,7 @@ public class Comms{
 		return downloadedPath;
 	}
 	
-/*
+
 	public static void findPathAndBroadcast(int bandID,MapLocation start, MapLocation goal, int bigBoxSize, int joinSquadNo) throws GameActionException{
 		//tell robots where to go
 		//the unit will not pathfind if the broadcast goal (for this band ID) is the same as the one currently on the message channel
@@ -40,7 +101,7 @@ public class Comms{
 			lengthOfEachPath[bandID]= path.size();
 			rc.broadcast(band+lengthOfEachPath[bandID]+1, -joinSquadNo);
 		}
-	}*/
+	}
 	
 	public static void pastrBuildingInProgress(MapLocation location) {
 		try {
