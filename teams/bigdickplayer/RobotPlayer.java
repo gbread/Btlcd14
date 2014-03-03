@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Random;
 
 import battlecode.common.*;
+import bigdickplayer.Comms.AttackType;
 
 public class RobotPlayer{
 	
@@ -42,9 +43,12 @@ public class RobotPlayer{
 		//MapLocation goal = getRandomLocation();
 		//path = BreadthFirst.pathTo(VectorFunctions.mldivide(rc.getLocation(),bigBoxSize), VectorFunctions.mldivide(goal,bigBoxSize), 100000);
 		//VectorFunctions.printPath(path,bigBoxSize);
-		 
+		
+		Comms.initArrays();
+		
+		HealthInfo.setHealth(rc.getHealth()); 
 
-		while(true){
+		while(true) {
 			try{
 				switch (rc.getType()) {
 				case HQ:
@@ -101,9 +105,20 @@ public class RobotPlayer{
 		}
 	}
 
-	private static void runPastr() {
+	private static void runPastr() throws GameActionException {
 		Comms.pastrBuildingInProgress(rc.getLocation());
-		
+		// TODO poslat info pri utoku
+		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,10000,rc.getTeam().opponent());
+		if (enemyRobots.length > 0) {
+			MapLocation[] robotLocations = VectorFunctions.robotsToLocations(enemyRobots, rc);
+
+			for (int i = 0; i < enemyRobots.length; i++) {
+				Comms.addOrUpdateEnemySolierLocation(enemyRobots[i].getID(), robotLocations[i]);
+				Comms.addRobotIdToArray(AttackType.PastrAttack, enemyRobots[i].getID());
+			}
+		} else {
+			Comms.clearAttackersArray(AttackType.PastrAttack);
+		}
 	}
 
 	private static void runHQ() throws GameActionException {
@@ -120,6 +135,7 @@ public class RobotPlayer{
 		//rc.broadcast(0, 0);
 		//after telling them where to go, consider spawning
 		tryToSpawn();
+
 	}
 
 	
@@ -135,6 +151,24 @@ public class RobotPlayer{
 		}
 	}
 	
+	static boolean tryAttackSomeoneIfNear(boolean tryToMoveCloserToShoot) throws GameActionException {
+		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,10000,rc.getTeam().opponent());
+		if(enemyRobots.length>0){//SHOOT AT, OR RUN TOWARDS, ENEMIES
+			MapLocation[] robotLocations = VectorFunctions.robotsToLocations(enemyRobots, rc);
+			MapLocation closestEnemyLoc = VectorFunctions.findClosest(robotLocations, rc.getLocation());
+			if(closestEnemyLoc.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){//close enough to shoot
+				if(rc.isActive()){
+					rc.attackSquare(closestEnemyLoc);
+				}
+			} else if (tryToMoveCloserToShoot) {//not close enough to shoot, so try to go shoot
+				Direction towardClosest = rc.getLocation().directionTo(closestEnemyLoc);
+				simpleMove(towardClosest);
+			}
+			return true;
+		}
+		return false;
+	}
+	
 	private static void runSoldier() throws GameActionException {
 		if (!rc.isActive()) return;
 		
@@ -147,13 +181,9 @@ public class RobotPlayer{
 			
 			return;
 		}
-		//if (rc.getRobot().getID() < 150) {
-			System.out.println(weHavePastr);
-			System.out.println(weHaveNoiseTower);
 			weHavePastr = Comms.doWeHavePastr();
 			weHaveNoiseTower = Comms.doWeHaveTower();
 
-		//}
 		/*
 		if (!weHavePastr && rc.senseCowsAtLocation(rc.getLocation()) > 0) {
 			
@@ -163,18 +193,9 @@ public class RobotPlayer{
 		} */
 		
 		//follow orders from HQ
-		Robot[] enemyRobots = rc.senseNearbyGameObjects(Robot.class,10000,rc.getTeam().opponent());
-		if(enemyRobots.length>0){//SHOOT AT, OR RUN TOWARDS, ENEMIES
-			MapLocation[] robotLocations = VectorFunctions.robotsToLocations(enemyRobots, rc);
-			MapLocation closestEnemyLoc = VectorFunctions.findClosest(robotLocations, rc.getLocation());
-			if(closestEnemyLoc.distanceSquaredTo(rc.getLocation())<rc.getType().attackRadiusMaxSquared){//close enough to shoot
-				if(rc.isActive()){
-					rc.attackSquare(closestEnemyLoc);
-				}
-			} /*else {//not close enough to shoot, so try to go shoot
-				Direction towardClosest = rc.getLocation().directionTo(closestEnemyLoc);
-				simpleMove(towardClosest);
-			}*/
+
+		if(tryAttackSomeoneIfNear(false)){//SHOOT AT, OR RUN TOWARDS, ENEMIES
+			
 		} else if (!weHavePastr && rc.senseCowsAtLocation(rc.getLocation()) > 0) {
 			
 			weHavePastr = true;
@@ -186,13 +207,14 @@ public class RobotPlayer{
 			
 			MapLocation pastrLocation = pastrLocations[0];
 			if (rc.getLocation().distanceSquaredTo(pastrLocation) <= 2) {
+				// TODO neco chytrejsiho.... jestli neni pobliz nepritel
 				buildNoiseTower();
 			} else {
 			
 				BasicPathing.tryToMove(rc.getLocation().directionTo(pastrLocation), true, rc, directionalLooks, allDirections, false);
 			}
 			
-		} else {
+		} else if (!weHavePastr) {
 			//NAVIGATION BY DOWNLOADED PATH
 			/*rc.setIndicatorString(0, "team "+myBand+", path length "+path.size());
 			if(path.size()<=1){
@@ -211,9 +233,43 @@ public class RobotPlayer{
 			}
 			*/
 			
+			// TODO NAJDEME NEJBLIZSI KRAVY (chytreji)
 			Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
 			BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
+		} else if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
+			// nekdo utoci na pastr
+			int[] attackingRobots = Comms.getAttacks(AttackType.PastrAttack);
+			int[][] soldiers = Comms.getEnemySoldiersAndLocations();
+			int soldierToAttackId = -1;
 			
+			outerloop:
+			for (int i = 0; i < soldiers.length; i++) {
+				for (int j = 0; j < attackingRobots.length; j++) {
+					if (soldiers[i][0] == attackingRobots[j]) {
+						soldierToAttackId = i;
+						break outerloop;
+					}					
+				}
+			}
+			if (soldierToAttackId == -1) {
+				Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
+				BasicPathing.guardLocation(towardEnemy, Comms.getOurPastrLocation(), true, rc, directionalLooks, allDirections, true);
+
+			} else {
+				
+				Direction towardEnemy = rc.getLocation().directionTo(VectorFunctions.intToLoc(soldiers[soldierToAttackId][1]));
+				BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
+			}
+			
+		} else {
+			// mame pastr a vez, tak je budeme chranit
+			MapLocation[] pastrLocations = rc.sensePastrLocations(rc.getTeam());
+			if (pastrLocations.length == 0) return;
+			
+			MapLocation pastrLocation = Comms.getOurPastrLocation();
+			
+			//MapLocation pastrLoc = rc.getLocation().directionTo(pastrLocation);
+			BasicPathing.guardLocation(pastrLocation.directionTo(rc.senseEnemyHQLocation()), pastrLocation, true, rc, directionalLooks, allDirections, true);
 		}
 		
 		//Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());

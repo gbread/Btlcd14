@@ -14,10 +14,19 @@ public class Comms{
 	static final int PASTR_LOCATION_CHANNEL = 65002;
 	
 	// TODO utoky - chceme vedet na co a odkud zautocil nepritel
+	// EDIT: asi budou stacit pozice nepratel
 	static final int SOLDIER_ATTACKS_CHANNEL = 65010;
 	static final int PASTR_OR_TOWER_ATTACKS_CHANNEL = 64050;
+	static final int ENEMY_SOLDIERS_LOCATIONS_CHANNEL = 64500;
+	static final int ENEMY_SOLDIERS_LOCATIONS_TUPLE_SIZE = 2;
+	static final int ENEMY_SOLDIERS_LOCATIONS_TUPLE_INDEX_ROBOTID = 0;
+	static final int ENEMY_SOLDIERS_LOCATIONS_TUPLE_INDEX_LOCATION = 1;
 	
-	enum AttackType {
+	public static void initArrays() throws GameActionException {
+		setTupleSizeOfArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL, ENEMY_SOLDIERS_LOCATIONS_TUPLE_SIZE);
+	}
+	
+ 	enum AttackType {
 		SoldierAttack, PastrAttack, HQAttack;
 		int getChannel() {
 			switch (this) {
@@ -33,48 +42,143 @@ public class Comms{
 		}
 	}
 	
-	// set of methods to handle with arrays of maplocations
-	private static MapLocation[] getMapLocationsArray(int channel) throws GameActionException {
-		int count = rc.readBroadcast(channel);
-		MapLocation[] result = new MapLocation[count];
-		for (int i = 0; i < result.length; i++) {
-			result[i] = VectorFunctions.intToLoc(rc.readBroadcast(channel + 1 + i));
+	
+	private static int getTupleSizeOfArray(int channel) throws GameActionException {
+		return rc.readBroadcast(channel + 1);
+	}
+	private static void setTupleSizeOfArray(int channel, int tupleSize) throws GameActionException {
+		rc.broadcast(channel + 1, tupleSize);
+	}
+	private static int getSizeOfTupleArray(int channel) throws GameActionException {
+		return rc.readBroadcast(channel);
+	}
+	private static void setSizeOfTupleArray(int channel, int size) throws GameActionException {
+		rc.broadcast(channel, size);
+	}
+
+	private static int[][] getTupleArray(int channel) throws GameActionException {
+		int size = getSizeOfTupleArray(channel);
+		int tupleSize = getTupleSizeOfArray(channel);
+		int[][] result = new int[size][tupleSize];
+		for (int i = 0; i < size; i++) {
+			for (int j = 0; j < tupleSize; j++) {
+				result[i][j] = rc.readBroadcast(channel+2+i*tupleSize + j);
+			}
 		}
 		return result;
 	}
-	static int getMapLocationsArrayCount(int channel) throws GameActionException {
+	private static void addToTupleArray(int channel, int[] tuple, int index) throws GameActionException {
+		for (int i = 0; i < tuple.length; i++) {
+			rc.broadcast(channel + 2 + index*tuple.length + i, tuple[i]);
+		}
+	}
+	private static void addToTupleArray(int channel, int[] tuple) throws GameActionException {
+		int size = getSizeOfTupleArray(channel);
+		//int tupleSize = getTupleSizeOfArray(channel);
+		setSizeOfTupleArray(channel, ++size);
+		addToTupleArray(channel, tuple, size-1);
+	}
+	private static int[] getTupleFromArrayAt(int channel, int index) throws GameActionException {
+		int tupleSize = getTupleSizeOfArray(channel);
+		int[] result = new int[tupleSize];
+		for (int j = 0; j < tupleSize; j++) {
+			result[j] = rc.readBroadcast(channel+2+index*tupleSize + j);
+		}
+		return result;
+	}
+	private static int getIndexOfTupleInArray(int channel, int tupleSize, int value, int indexInTuple) throws GameActionException {
+		int count = getSizeOfTupleArray(channel);
+		for (int i = 0; i < count; i++) {
+			int[] tuple = getTupleFromArrayAt(channel, i);
+			if (tuple[indexInTuple] == value) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	static int[][] getEnemySoldiersAndLocations() throws GameActionException {
+		return getTupleArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL);
+	}
+	static boolean addOrUpdateEnemySolierLocation(int robotId, MapLocation location) throws GameActionException {
+		int index = getIndexOfTupleInArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL, ENEMY_SOLDIERS_LOCATIONS_TUPLE_SIZE, 
+								robotId, ENEMY_SOLDIERS_LOCATIONS_TUPLE_INDEX_ROBOTID);
+		int[] tuple = new int[ENEMY_SOLDIERS_LOCATIONS_TUPLE_SIZE];
+		tuple[ENEMY_SOLDIERS_LOCATIONS_TUPLE_INDEX_ROBOTID] = robotId;
+		tuple[ENEMY_SOLDIERS_LOCATIONS_TUPLE_INDEX_LOCATION] = VectorFunctions.locToInt(location);
+		
+		if (index < 0)
+		{
+			addToTupleArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL, tuple);
+			return true;
+		} else {
+			addToTupleArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL, tuple, index);
+			return false;
+		}
+		
+	}
+	static void clearEnemySoldiersAndLocations() throws GameActionException {
+		setSizeOfTupleArray(ENEMY_SOLDIERS_LOCATIONS_CHANNEL, 0);
+	}
+
+	
+	
+	// set of methods to handle with arrays of maplocations
+
+	private static int[] getArray(int channel) throws GameActionException {
+		int count = rc.readBroadcast(channel);
+		int[] result = new int[count];
+		for (int i = 0; i < result.length; i++) {
+			result[i] = rc.readBroadcast(channel + 1 + i);
+		}
+		return result;
+	}
+	static int getArrayCount(int channel) throws GameActionException {
 		return rc.readBroadcast(channel);
 	}
-	private static int addMapLocationToArray(int channel, MapLocation location) throws GameActionException {
-		int count = getMapLocationsArrayCount(channel);
-		rc.broadcast(channel + ++count, VectorFunctions.locToInt(location));
+	private static int addIntToArray(int channel, int value) throws GameActionException {
+		int count = getArrayCount(channel);
+		rc.broadcast(channel + ++count, value);
 		return count;
 	}
-	private static boolean deleteMapLocationFromArray(int channel, int index) throws GameActionException {
-		int count = getMapLocationsArrayCount(channel);
+	private static boolean deleteValueFromArray(int channel, int index) throws GameActionException {
+		int count = getArrayCount(channel);
 		if (index >= count) return false;
 		int lastItem = rc.readBroadcast(channel + count--);
 		rc.broadcast(channel + index + 1, lastItem);
 		return true;
 	}
+	private static int clear(int channel) throws GameActionException {
+		int count = getArrayCount(channel);
+		rc.broadcast(channel, 0);
+		return count;
+	}
+
 	
- 	public static MapLocation[] getAttacks(AttackType type) throws GameActionException {
+  	public static int[] getAttacks(AttackType type) throws GameActionException {
 		int channel = type.getChannel();
-		return getMapLocationsArray(channel);
+		return getArray(channel);
 	}
  	static int getAttackersCount(AttackType type) throws GameActionException {
 		int channel = type.getChannel();
-		return getMapLocationsArrayCount(channel);
+		return getArrayCount(channel);
  	}
- 	static int addMapLocationToArray(AttackType type, MapLocation location) throws GameActionException {
+ 	static int addRobotIdToArray(AttackType type, int RobotId) throws GameActionException {
  		int channel = type.getChannel();
-		return addMapLocationToArray(channel, location);
+		return addIntToArray(channel, RobotId);
  	}
  	static boolean deleteAttackerFromArray(AttackType type, int index) throws GameActionException {
  		int channel = type.getChannel();
-		return deleteMapLocationFromArray(channel, index);
+		return deleteValueFromArray(channel, index);
  	}
-	
+ 	static int clearAttackersArray(AttackType type) throws GameActionException {
+		int channel = type.getChannel();
+		return clear(channel);
+		
+ 	}
+ 	
+ 	
+ 	
 	public static ArrayList<MapLocation> downloadPath() throws GameActionException {
 		ArrayList<MapLocation> downloadedPath = new ArrayList<MapLocation>();
 		int locationInt = rc.readBroadcast(RobotPlayer.myBand+1);
