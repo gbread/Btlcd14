@@ -129,7 +129,8 @@ public class RobotPlayer{
 	
 	static double noiseTowerAngle = 0;
 	static double noiseTowerRadius = 0;
-	private static int[][] soldierAndLocations;	
+	private static int[][] soldierAndLocations;
+	private static MapLocation closestSoldierAttacker;	
 	static final double angleTurn = Math.PI/4; 
 	static final double noiseTowerRadiusDiff = 2; 
 	
@@ -179,7 +180,7 @@ public class RobotPlayer{
 
 		if (enemyRobots.length > 0) {
 			for (int i = 0; i < enemyRobots.length; i++) {
-				System.out.println("PASTR");
+				//System.out.println("PASTR");
 				Comms.addRobotIdToArray(AttackType.PastrAttack, enemyRobots[i].getID());
 			}
 		} else {
@@ -208,7 +209,7 @@ public class RobotPlayer{
 		tryToSpawn();
 		
 		// DEBUG
-		
+		/*
 		if (Clock.getRoundNum() < 500 ) {
 			if (Comms.getEnemySoldiersAndLocations().length > 0) {
 				
@@ -232,7 +233,7 @@ public class RobotPlayer{
 			//System.out.println("Pastr attackers: " + Arrays.toString(Comms.getAttacks(AttackType.PastrAttack)));
 			//System.out.println(Comms.getEnemySoldiersAndLocations());
 		}
-		
+		*/
 
 	}
 
@@ -270,6 +271,25 @@ public class RobotPlayer{
 		return false;
 	}
 	
+	static boolean tryAttackSoldierAttackerIfNear(int maxSquaredDistance) throws GameActionException {
+		if (soldierAndLocations.length == 0 || enemyRobots.length > 0) return false;
+		if((!weHavePastr || (closestSoldierAttacker != null && Comms.getOurPastrLocation().distanceSquaredTo(closestSoldierAttacker) < 30))) {
+			// posun k nejblizsimu robotu
+			int minDistIndex = 0;
+			for (int i = 1; i < soldierAndLocations.length; i++) {
+				if (soldierAndLocations[i][1] < soldierAndLocations[minDistIndex][1]) {
+					minDistIndex = i;
+				}
+			}
+			closestEnemyLoc = VectorFunctions.intToLoc(soldierAndLocations[minDistIndex][1]);
+			return rc.getLocation().distanceSquaredTo(closestEnemyLoc) <= maxSquaredDistance;
+			// TODO tady je problem.... asi v podmince... kdyz chci zdrhnout. Pridam tohle telo do podminky a
+			// zajistim, abych zbytecne neutocil
+			//BasicPathing.tryToMove(rc.getLocation().directionTo(VectorFunctions.intToLoc(soldierAndLocations[minDistIndex][1])), true, rc, directionalLooks, allDirections, true);
+		}
+		return false;
+	}
+	
 	private static void runSoldier() throws GameActionException {
 		if (!rc.isActive()) return;
 		
@@ -294,7 +314,7 @@ public class RobotPlayer{
 			return;
 		}
 		
-        if (maxCow == null) {
+        if (maxCow == null && !weHavePastr) {
             maxCow = findCows();
         }
 
@@ -306,7 +326,7 @@ public class RobotPlayer{
 			rc.construct(RobotType.PASTR);
 		} */
 						
-		MapLocation closestSoldierAttacker = VectorFunctions.closestRobotToLocation(Comms.getAttacks(AttackType.SoldierAttack), rc.getLocation(), rc);
+		closestSoldierAttacker = VectorFunctions.closestRobotToLocation(Comms.getAttacks(AttackType.SoldierAttack), rc.getLocation(), rc);
 		
 		soldierAndLocations = Comms.getEnemySoldiersAndLocations();
 		
@@ -345,17 +365,9 @@ public class RobotPlayer{
 		} else if (closestSoldierAttacker != null && closestSoldierAttacker.distanceSquaredTo(rc.getLocation()) < 20) {
 			 BasicPathing.tryToMove(rc.getLocation().directionTo(closestSoldierAttacker), true, rc, directionalLooks, allDirections, true);
 				
-		} else if(soldierAndLocations.length > 0 && enemyRobots.length == 0 && (!weHavePastr || Comms.getOurPastrLocation().distanceSquaredTo(closestSoldierAttacker) < 30)) {
+		} else if (tryAttackSoldierAttackerIfNear(10) ) {
 			// posun k nejblizsimu robotu
-			int minDistIndex = 0;
-			for (int i = 1; i < soldierAndLocations.length; i++) {
-				if (soldierAndLocations[i][1] < soldierAndLocations[minDistIndex][1]) {
-					minDistIndex = i;
-				}
-			}
-			// TODO tady je problem.... asi v podmince... kdyz chci zdrhnout. Pridam tohle telo do podminky a
-			// zajistim, abych zbytecne neutocil
-			BasicPathing.tryToMove(rc.getLocation().directionTo(VectorFunctions.intToLoc(soldierAndLocations[minDistIndex][1])), true, rc, directionalLooks, allDirections, true);
+			BasicPathing.tryToMove(rc.getLocation().directionTo(closestEnemyLoc), true, rc, directionalLooks, allDirections, true);
 		} else if (!weHavePastr && maxCow.distanceSquaredTo(rc.getLocation())<5) {
 			
 			weHavePastr = true;
@@ -398,7 +410,7 @@ public class RobotPlayer{
 
  
             Direction towardEnemy = rc.getLocation().directionTo(maxCow);
-            BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
+            BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, false);//was Direction.SOUTH_EAST
         
 		} else {
 			// mame pastr a vez, tak je budeme chranit
@@ -446,7 +458,7 @@ public class RobotPlayer{
         
         for (int i = 0; i < cows.length; i++) {
             double[] cowRow = cows[i];
-            for (int j = 0; j < cowRow.length; j++) {
+            for (int j = i%2; j < cowRow.length; j += 2) {
                 double cow = cowRow[j];
                 
                 double addedValue = Math.pow(enemyHQLoc.distanceSquaredTo(new MapLocation(i, j)),2)*cow/ourHQLoc.distanceSquaredTo(new MapLocation(i, j));
