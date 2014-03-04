@@ -255,7 +255,10 @@ public class RobotPlayer{
 				if(rc.isActive()){
 					rc.attackSquare(closestEnemyLoc);
 					didShotAt = closestEnemyLoc;
-					didShotAtId = rc.senseObjectAtLocation(closestEnemyLoc).getID();
+					GameObject obj = rc.senseObjectAtLocation(closestEnemyLoc);
+					if (obj != null)
+						didShotAtId = obj.getID();
+					// TODO prasarna
 					return true;
 				}
 			} else if (tryToMoveCloserToShoot) {//not close enough to shoot, so try to go shoot
@@ -311,7 +314,7 @@ public class RobotPlayer{
 		
 			
 			
-		if(didShot = tryAttackSomeoneIfNear(false)){//SHOOT AT, OR RUN TOWARDS, ENEMIES
+		if(didShot = (closestEnemyLoc != null && tryAttackSomeoneIfNear(false))){//SHOOT AT, OR RUN TOWARDS, ENEMIES
 			
 		} else if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
 			// nekdo utoci na pastr
@@ -350,6 +353,8 @@ public class RobotPlayer{
 					minDistIndex = i;
 				}
 			}
+			// TODO tady je problem.... asi v podmince... kdyz chci zdrhnout. Pridam tohle telo do podminky a
+			// zajistim, abych zbytecne neutocil
 			BasicPathing.tryToMove(rc.getLocation().directionTo(VectorFunctions.intToLoc(soldierAndLocations[minDistIndex][1])), true, rc, directionalLooks, allDirections, true);
 		} else if (!weHavePastr && maxCow.distanceSquaredTo(rc.getLocation())<5) {
 			
@@ -444,7 +449,7 @@ public class RobotPlayer{
             for (int j = 0; j < cowRow.length; j++) {
                 double cow = cowRow[j];
                 
-                double addedValue = enemyHQLoc.distanceSquaredTo(new MapLocation(i, j))*cow/ourHQLoc.distanceSquaredTo(new MapLocation(i, j));
+                double addedValue = Math.pow(enemyHQLoc.distanceSquaredTo(new MapLocation(i, j)),2)*cow/ourHQLoc.distanceSquaredTo(new MapLocation(i, j));
                 
                 if (addedValue > max) {
                     max = addedValue;
