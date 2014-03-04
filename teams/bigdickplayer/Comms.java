@@ -12,6 +12,8 @@ public class Comms{
 	static final int PASTR_CHANNEL = 65000;
 	static final int NOISE_TOWER_CHANNEL = 65001;
 	static final int PASTR_LOCATION_CHANNEL = 65002;
+	// TODO
+	static final int PASTR_UNDER_FIRE_CHANNEL = 65003;
 	
 	// TODO utoky - chceme vedet na co a odkud zautocil nepritel
 	// EDIT: asi budou stacit pozice nepratel
@@ -252,13 +254,12 @@ public class Comms{
 			rc.broadcast(PASTR_CHANNEL, 1);
 			rc.broadcast(PASTR_LOCATION_CHANNEL, VectorFunctions.locToInt(location));
 	}
-	public static void noiseTowerBuildingInProgress() {
-		try {
+
+	public static void noiseTowerBuildingInProgress() throws GameActionException {
 			rc.broadcast(NOISE_TOWER_CHANNEL, 1);
-		} catch (GameActionException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+	}
+	public static void noiseTowerDestroyed() throws GameActionException {
+		rc.broadcast(NOISE_TOWER_CHANNEL, 0);
 	}
 	public static boolean doWeHavePastr() throws GameActionException {
 		return rc.readBroadcast(PASTR_CHANNEL) != 0;

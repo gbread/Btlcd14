@@ -5,6 +5,7 @@ import bigdickplayer.Comms.AttackType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 public class RobotPlayer{
@@ -50,7 +51,7 @@ public class RobotPlayer{
 			tryToSpawn();
 			BreadthFirst.init(rc, bigBoxSize);
 			rallyPoint = VectorFunctions.mladd(VectorFunctions.mldivide(VectorFunctions.mlsubtract(rc.senseEnemyHQLocation(),rc.senseHQLocation()),3),rc.senseHQLocation());
-		}else{
+		} else {
 			BreadthFirst.rc=rcIn;//slimmed down init
 		}
 		//rc.broadcast(0, 0);
@@ -66,19 +67,43 @@ public class RobotPlayer{
 			closestEnemyLoc = null;
 			enemyRobots = rc.senseNearbyGameObjects(Robot.class,15000,rc.getTeam().opponent());
 			if (enemyRobots.length > 0) {
-				robotLocations = VectorFunctions.robotsToLocations(enemyRobots, rc);
-				closestEnemyLoc = VectorFunctions.findClosest(robotLocations, rc.getLocation());
-				closestEnemyID = rc.senseObjectAtLocation(closestEnemyLoc).getID();
-				boolean was = false;
-				for (int i = 0; i < enemyRobots.length; i++) {
-					was |= (enemyRobots[i].getID() == didShotAtId);
-					Comms.addOrUpdateEnemySolierLocation(enemyRobots[i].getID(), robotLocations[i]);
+				MapLocation[] maplocs = VectorFunctions.robotsToLocations(enemyRobots, rc);
+
+				int hqindex = Arrays.asList(maplocs).indexOf(rc.senseEnemyHQLocation());
+				if (hqindex >= 0) {
+					maplocs[hqindex] = maplocs[maplocs.length-1];
+					robotLocations = new MapLocation[maplocs.length - 1];
+					System.arraycopy(maplocs, 0, robotLocations, 0, maplocs.length-1);
+					
+					Robot[] robs = new Robot[enemyRobots.length - 1];
+					System.arraycopy(enemyRobots, 0, robs, 0, robs.length);
+					if (hqindex != enemyRobots.length - 1)
+						robs[hqindex] = enemyRobots[enemyRobots.length - 1];
+					
+					enemyRobots = robs;
+					
+				} else {
+					robotLocations = maplocs;
 				}
-				if (!was) {
-					Comms.deleteEnemySoldierAndLocation(didShotAtId);
-					Comms.deleteAttackerFromArrays(didShotAtId);
+				if (enemyRobots.length > 0) {
+					closestEnemyLoc = VectorFunctions.findClosest(robotLocations, rc.getLocation());
+					closestEnemyID = rc.senseObjectAtLocation(closestEnemyLoc).getID();
+					boolean was = false;
+					for (int i = 0; i < enemyRobots.length; i++) {
+						was |= (enemyRobots[i].getID() == didShotAtId);
+						Comms.addOrUpdateEnemySolierLocation(enemyRobots[i].getID(), robotLocations[i]);
+					}
+					if (!was) {
+						Comms.deleteEnemySoldierAndLocation(didShotAtId);
+						Comms.deleteAttackerFromArrays(didShotAtId);
+					}
 				}
 			}
+
+			weHavePastr = Comms.doWeHavePastr();
+			weHaveNoiseTower = Comms.doWeHaveTower();
+			hadPastr = rc.sensePastrLocations(rc.getTeam()).length > 0;
+
 			try{
 				switch (rc.getType()) {
 				case HQ:
@@ -109,8 +134,21 @@ public class RobotPlayer{
 	static final double noiseTowerRadiusDiff = 2; 
 	
 	private static void runNoiseTower() throws GameActionException {
-		Comms.noiseTowerBuildingInProgress();
 		if (rc.isActive()) {
+			if (weHavePastr)
+				Comms.noiseTowerBuildingInProgress();
+			else {
+				rc.selfDestruct();
+				Comms.noiseTowerDestroyed();
+			}
+			
+			if (enemyRobots.length > 0) {
+				for (int i = 0; i < enemyRobots.length; i++) {
+					Comms.addRobotIdToArray(AttackType.PastrAttack, enemyRobots[i].getID());
+				}
+			} else {
+				Comms.clearAttackersArray(AttackType.PastrAttack);
+			}
 			
 			int radiusSquared = 300;
 			
@@ -145,7 +183,7 @@ public class RobotPlayer{
 				Comms.addRobotIdToArray(AttackType.PastrAttack, enemyRobots[i].getID());
 			}
 		} else {
-			Comms.clearAttackersArray(AttackType.PastrAttack);
+		//	Comms.clearAttackersArray(AttackType.PastrAttack);
 		}
 	}
 
@@ -160,7 +198,8 @@ public class RobotPlayer{
 			//Comms.findPathAndBroadcast(2,rallyPoint,enemyPastrs[0],bigBoxSize,2);//for some reason, they are not getting this message
 		}
 		
-		if (hadPastr && rc.sensePastrLocations(rc.getTeam()).length == 0) {
+		if (weHavePastr && hadPastr && rc.sensePastrLocations(rc.getTeam()).length == 0) {
+			System.out.println("Znicenej PASTR HQ");
 			Comms.pastrDestroyed();
 			hadPastr = false;
 		}
@@ -170,7 +209,7 @@ public class RobotPlayer{
 		
 		// DEBUG
 		
-		if (Clock.getRoundNum() < 200 ) {
+		if (Clock.getRoundNum() < 500 ) {
 			if (Comms.getEnemySoldiersAndLocations().length > 0) {
 				
 				int[][] enemies = Comms.getEnemySoldiersAndLocations();
@@ -238,6 +277,7 @@ public class RobotPlayer{
 		if (rc.isConstructing()) {
 			if (rc.getConstructingType() == RobotType.PASTR) {
 				if (HealthInfo.attacked && HealthInfo.health < 0.2) {
+					System.out.println("Znicenej PASTR SOLDIER");
 					Comms.pastrDestroyed();
 					rc.selfDestruct();
 					return;
@@ -250,9 +290,11 @@ public class RobotPlayer{
 			
 			return;
 		}
-			weHavePastr = Comms.doWeHavePastr();
-			weHaveNoiseTower = Comms.doWeHaveTower();
-			if (weHavePastr) hadPastr = true;
+		
+        if (maxCow == null) {
+            maxCow = findCows();
+        }
+
 		/*
 		if (!weHavePastr && rc.senseCowsAtLocation(rc.getLocation()) > 0) {
 			
@@ -261,10 +303,11 @@ public class RobotPlayer{
 			rc.construct(RobotType.PASTR);
 		} */
 						
-			MapLocation closestSoldierAttacker = VectorFunctions.closestRobotToLocation(Comms.getAttacks(AttackType.SoldierAttack), rc.getLocation(), rc);
-			
-			soldierAndLocations = Comms.getEnemySoldiersAndLocations();
-			//follow orders from HQ
+		MapLocation closestSoldierAttacker = VectorFunctions.closestRobotToLocation(Comms.getAttacks(AttackType.SoldierAttack), rc.getLocation(), rc);
+		
+		soldierAndLocations = Comms.getEnemySoldiersAndLocations();
+		
+		//follow orders from HQ
 		
 			
 			
@@ -296,12 +339,19 @@ public class RobotPlayer{
 				BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
 			}
 			
-		} /*else if(soldierAndLocations.length > 0) {
-			
-		}*/ else if (closestSoldierAttacker != null && closestSoldierAttacker.distanceSquaredTo(rc.getLocation()) < 40) {
-			 BasicPathing.tryToMove(rc.getLocation().directionTo(closestSoldierAttacker), true, rc, directionalLooks, allDirections, false);
-			
-		} else if (!weHavePastr && rc.senseCowsAtLocation(rc.getLocation()) > 0) {
+		} else if (closestSoldierAttacker != null && closestSoldierAttacker.distanceSquaredTo(rc.getLocation()) < 20) {
+			 BasicPathing.tryToMove(rc.getLocation().directionTo(closestSoldierAttacker), true, rc, directionalLooks, allDirections, true);
+				
+		} else if(soldierAndLocations.length > 0 && enemyRobots.length == 0 && (!weHavePastr || Comms.getOurPastrLocation().distanceSquaredTo(closestSoldierAttacker) < 30)) {
+			// posun k nejblizsimu robotu
+			int minDistIndex = 0;
+			for (int i = 1; i < soldierAndLocations.length; i++) {
+				if (soldierAndLocations[i][1] < soldierAndLocations[minDistIndex][1]) {
+					minDistIndex = i;
+				}
+			}
+			BasicPathing.tryToMove(rc.getLocation().directionTo(VectorFunctions.intToLoc(soldierAndLocations[minDistIndex][1])), true, rc, directionalLooks, allDirections, true);
+		} else if (!weHavePastr && maxCow.distanceSquaredTo(rc.getLocation())<5) {
 			
 			weHavePastr = true;
 			Comms.pastrBuildingInProgress(rc.getLocation());
@@ -341,10 +391,7 @@ public class RobotPlayer{
 			//Direction towardEnemy = rc.getLocation().directionTo(rc.senseEnemyHQLocation());
 			//BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
 
-            if (maxCow == null) {
-                maxCow = findCows();
-            }
-
+ 
             Direction towardEnemy = rc.getLocation().directionTo(maxCow);
             BasicPathing.tryToMove(towardEnemy, true, rc, directionalLooks, allDirections, true);//was Direction.SOUTH_EAST
         
@@ -378,19 +425,29 @@ public class RobotPlayer{
      */
     private static MapLocation findCows() {
 
+    	// TODO ulozime si nak pozice krav do bool[][], abychom vedeli, kde se da urcite chodit...
+    	// TODO neco lepsiho nez astar (milanuv) by nebylo? 
+    	// varianta 1: Zkusime se proste co nejdriv dostat na kravu a pak pujdeme jen po kravach.....
+    	
         double[][] cows = rc.senseCowGrowth(); //Stoji 100 bytecodu!! (TODO:mozna volat jen jednou pokud je pole staticke a nekam si ho ulozit)
 
         double max = Double.MIN_VALUE;
         int x = cows.length / 2;
         int y = cows[0].length / 2;
 
+        MapLocation ourHQLoc = rc.senseHQLocation();
+        MapLocation enemyHQLoc = rc.senseEnemyHQLocation();
+        
+        
         for (int i = 0; i < cows.length; i++) {
             double[] cowRow = cows[i];
             for (int j = 0; j < cowRow.length; j++) {
                 double cow = cowRow[j];
-
-                if (cow > max) {
-                    max = cow;
+                
+                double addedValue = enemyHQLoc.distanceSquaredTo(new MapLocation(i, j))*cow/ourHQLoc.distanceSquaredTo(new MapLocation(i, j));
+                
+                if (addedValue > max) {
+                    max = addedValue;
                     x = i;
                     y = j;
                 }
