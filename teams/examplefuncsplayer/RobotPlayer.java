@@ -12,7 +12,15 @@ public class RobotPlayer {
 	
 	public static void run(RobotController rc) {
 		rand = new Random();
-		Direction[] directions = {Direction.NORTH, Direction.NORTH_EAST, Direction.EAST, Direction.SOUTH_EAST, Direction.SOUTH, Direction.SOUTH_WEST, Direction.WEST, Direction.NORTH_WEST};
+		Direction[] directions = {
+                Direction.NORTH,
+                Direction.NORTH_EAST,
+                Direction.EAST,
+                Direction.SOUTH_EAST,
+                Direction.SOUTH,
+                Direction.SOUTH_WEST,
+                Direction.WEST,
+                Direction.NORTH_WEST};
 		
 		while(true) {
 			if (rc.getType() == RobotType.HQ) {

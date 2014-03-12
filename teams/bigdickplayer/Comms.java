@@ -14,6 +14,8 @@ public class Comms{
 	static final int PASTR_LOCATION_CHANNEL = 65002;
 	// TODO
 	static final int PASTR_UNDER_FIRE_CHANNEL = 65003;
+    static final int COWS_LOCATION_CHANNEL = 65004;
+
 	
 	// TODO utoky - chceme vedet na co a odkud zautocil nepritel
 	// EDIT: asi budou stacit pozice nepratel

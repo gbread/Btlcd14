@@ -9,6 +9,24 @@ import java.util.List;
 import java.util.Random;
 
 public class RobotPlayer{
+
+    enum State {
+        DEFENSIVE(0),
+        OFFENSIVE(1),
+        BUILD_PASTR(2),
+        BUILD_NOISETOWER(3);
+
+        private int value;
+        private State(int value) {
+            this.value = value;
+        }
+
+        public int toInt() {
+            return value;
+        }
+
+    }
+
 	
 	static RobotController rc;
 	static Direction allDirections[] = Direction.values();
@@ -38,6 +56,8 @@ public class RobotPlayer{
 	
 
     static MapLocation maxCow = null;
+    static State state = State.DEFENSIVE;
+
 
     public static void run(RobotController rcIn) throws GameActionException {
         rc=rcIn;
@@ -207,33 +227,6 @@ public class RobotPlayer{
 		//rc.broadcast(0, 0);
 		//after telling them where to go, consider spawning
 		tryToSpawn();
-		
-		// DEBUG
-		/*
-		if (Clock.getRoundNum() < 500 ) {
-			if (Comms.getEnemySoldiersAndLocations().length > 0) {
-				
-				int[][] enemies = Comms.getEnemySoldiersAndLocations();
-				System.out.print("All enemies soldiers: ");
-				for (int i = 0; i < enemies.length; i++) {
-					System.out.print(enemies[i][0] + ":");
-					
-					System.out.print(VectorFunctions.intToLoc(enemies[i][1]) + " ");
-				}
-				System.out.println();
-			}
-			if (Comms.getAttackersCount(AttackType.PastrAttack) > 0) {
-				System.out.println("Pastr attackers count: " + Comms.getAttackersCount(AttackType.PastrAttack));
-				System.out.println("Pastr attackers: " + Arrays.toString(Comms.getAttacks(AttackType.PastrAttack)));
-			}
-			if (Comms.getAttackersCount(AttackType.SoldierAttack) > 0) {
-				System.out.println("Soldier attackers count: " + Comms.getAttackersCount(AttackType.SoldierAttack));
-				System.out.println("Soldier attackers: " + Arrays.toString(Comms.getAttacks(AttackType.SoldierAttack)));
-			}
-			//System.out.println("Pastr attackers: " + Arrays.toString(Comms.getAttacks(AttackType.PastrAttack)));
-			//System.out.println(Comms.getEnemySoldiersAndLocations());
-		}
-		*/
 
 	}
 
@@ -461,7 +454,7 @@ public class RobotPlayer{
             for (int j = i%2; j < cowRow.length; j += 2) {
                 double cow = cowRow[j];
                 
-                double addedValue = Math.pow(enemyHQLoc.distanceSquaredTo(new MapLocation(i, j)),2)*cow/ourHQLoc.distanceSquaredTo(new MapLocation(i, j));
+                double addedValue = cow; //Math.pow(enemyHQLoc.distanceSquaredTo(new MapLocation(i, j)),2)*cow/ourHQLoc.distanceSquaredTo(new MapLocation(i, j));
                 
                 if (addedValue > max) {
                     max = addedValue;
